@@ -21,6 +21,11 @@ const DELEGATED_SCOPES = [
   "https://graph.microsoft.com/Mail.Send",
   "https://graph.microsoft.com/Calendars.ReadWrite",
   "https://graph.microsoft.com/Calendars.ReadWrite.Shared",
+  "https://graph.microsoft.com/Team.ReadBasic.All",
+  "https://graph.microsoft.com/Channel.ReadBasic.All",
+  "https://graph.microsoft.com/ChannelMessage.Send",
+  "https://graph.microsoft.com/ChannelMessage.Read.All",
+  "https://graph.microsoft.com/Chat.ReadWrite",
   "offline_access",
 ];
 
