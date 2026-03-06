@@ -56,7 +56,7 @@ function buildRecurrence(opts: Record<string, unknown>): object | undefined {
     range: {
       ...range,
       startDate,
-      recurrenceTimeZone: (opts.timezone as string) ?? "UTC",
+      recurrenceTimeZone: (opts.timezone as string) ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
     },
   };
 }
@@ -66,7 +66,7 @@ function buildEventBody(opts: Record<string, unknown>): Record<string, unknown> 
 
   if (opts.subject !== undefined) body.subject = opts.subject;
 
-  const tz = (opts.timezone as string) ?? "UTC";
+  const tz = (opts.timezone as string) ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   if (opts.start !== undefined) body.start = { dateTime: opts.start, timeZone: tz };
   if (opts.end !== undefined) body.end = { dateTime: opts.end, timeZone: tz };
   if (opts.allDay) body.isAllDay = true;
