@@ -1,0 +1,30 @@
+{
+  "name": "@openclaw/sp-cli",
+  "version": "0.1.0",
+  "description": "SharePoint Online CLI for openclaw agents",
+  "main": "dist/index.js",
+  "bin": {
+    "sp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^2.16.2",
+    "commander": "^12.1.0",
+    "dotenv": "^17.3.1",
+    "keytar": "^7.9.0",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.6",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
