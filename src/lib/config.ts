@@ -37,9 +37,7 @@ export function readConfig(): SpConfig {
 }
 
 export function writeConfig(config: SpConfig): void {
-  if (!fs.existsSync(CONFIG_DIR)) {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
-  }
+  fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), {
     encoding: "utf8",
     mode: 0o600,

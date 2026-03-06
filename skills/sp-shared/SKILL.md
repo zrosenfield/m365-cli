@@ -16,7 +16,7 @@ metadata:
 
 Install and build the CLI:
 ```bash
-npm install -g @openclaw/sp-cli
+npm install -g sp-cli
 # or from source:
 cd sp-cli && npm install && npm run build && npm link
 ```

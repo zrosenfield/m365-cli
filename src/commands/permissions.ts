@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { graph } from "../lib/graph.js";
+import { graph, validateId } from "../lib/graph.js";
 import { readConfig } from "../lib/config.js";
 import { outputData, handleCommandError } from "../lib/output.js";
 
@@ -9,6 +9,8 @@ function resolveDrive(opts: { site?: string; drive?: string }): { siteId: string
   const driveId = opts.drive || config.defaultDriveId;
   if (!siteId) throw new Error("Site ID required. Use --site or run `sp config set --site <id>`.");
   if (!driveId) throw new Error("Drive ID required. Use --drive or run `sp config set --drive <id>`.");
+  validateId(siteId, "site ID");
+  validateId(driveId, "drive ID");
   return { siteId, driveId };
 }
 
@@ -23,6 +25,7 @@ export function registerPermissionCommands(program: Command): void {
     .action(async (itemId, opts) => {
       try {
         const { driveId } = resolveDrive(opts);
+        validateId(itemId, "item ID");
         const result = await graph.get<{ value: unknown[] }>(
           `/drives/${driveId}/items/${itemId}/permissions`
         );
@@ -40,6 +43,8 @@ export function registerPermissionCommands(program: Command): void {
     .action(async (itemId, permId, opts) => {
       try {
         const { driveId } = resolveDrive(opts);
+        validateId(itemId, "item ID");
+        validateId(permId, "permission ID");
         const result = await graph.get<unknown>(
           `/drives/${driveId}/items/${itemId}/permissions/${permId}`
         );
@@ -59,6 +64,7 @@ export function registerPermissionCommands(program: Command): void {
     .action(async (itemId, opts) => {
       try {
         const { driveId } = resolveDrive(opts);
+        validateId(itemId, "item ID");
         const emails = opts.emails.split(",").map((e: string) => e.trim());
 
         // Map friendly role names to Graph roles
@@ -96,6 +102,8 @@ export function registerPermissionCommands(program: Command): void {
     .action(async (itemId, permId, opts) => {
       try {
         const { driveId } = resolveDrive(opts);
+        validateId(itemId, "item ID");
+        validateId(permId, "permission ID");
         const roleMap: Record<string, string> = {
           reader: "read",
           writer: "write",
@@ -123,6 +131,8 @@ export function registerPermissionCommands(program: Command): void {
     .action(async (itemId, permId, opts) => {
       try {
         const { driveId } = resolveDrive(opts);
+        validateId(itemId, "item ID");
+        validateId(permId, "permission ID");
         await graph.delete(`/drives/${driveId}/items/${itemId}/permissions/${permId}`);
         outputData({ message: `Permission ${permId} revoked from item ${itemId}.` });
       } catch (err) {

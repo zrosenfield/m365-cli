@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import fs from "fs";
 import path from "path";
-import { graph } from "../lib/graph.js";
+import { graph, validateId } from "../lib/graph.js";
 import { readConfig } from "../lib/config.js";
 import { outputData, handleCommandError } from "../lib/output.js";
 
@@ -11,6 +11,8 @@ function resolveDrive(opts: { site?: string; drive?: string }): { siteId: string
   const driveId = opts.drive || config.defaultDriveId;
   if (!siteId) throw new Error("Site ID required. Use --site or run `sp config set --site <id>`.");
   if (!driveId) throw new Error("Drive ID required. Use --drive or run `sp config set --drive <id>`.");
+  validateId(siteId, "site ID");
+  validateId(driveId, "drive ID");
   return { siteId, driveId };
 }
 
@@ -44,6 +46,7 @@ export function registerFileCommands(program: Command): void {
     .action(async (itemId, opts) => {
       try {
         const { driveId } = resolveDrive(opts);
+        validateId(itemId, "item ID");
         const result = await graph.get<unknown>(`/drives/${driveId}/items/${itemId}`);
         outputData(result);
       } catch (err) {
@@ -82,6 +85,7 @@ export function registerFileCommands(program: Command): void {
     .action(async (itemId, opts) => {
       try {
         const { driveId } = resolveDrive(opts);
+        validateId(itemId, "item ID");
 
         // Get download URL
         const meta = await graph.get<{ name?: string; "@microsoft.graph.downloadUrl"?: string }>(
@@ -94,7 +98,7 @@ export function registerFileCommands(program: Command): void {
         const res = await fetch(downloadUrl);
         if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
 
-        const outputPath = opts.output || meta.name || itemId;
+        const outputPath = opts.output || path.basename(meta.name || itemId);
         const buffer = await res.buffer();
         fs.writeFileSync(outputPath, buffer);
         outputData({ message: `Downloaded to ${outputPath}`, bytes: buffer.length });
@@ -114,6 +118,7 @@ export function registerFileCommands(program: Command): void {
     .action(async (itemId, opts) => {
       try {
         const { driveId } = resolveDrive(opts);
+        validateId(itemId, "item ID");
         const destDriveId = opts.destDrive || driveId;
 
         const body: Record<string, unknown> = {
@@ -144,6 +149,7 @@ export function registerFileCommands(program: Command): void {
     .action(async (itemId, opts) => {
       try {
         const { driveId } = resolveDrive(opts);
+        validateId(itemId, "item ID");
         const destDriveId = opts.destDrive || driveId;
 
         const result = await graph.patch<unknown>(`/drives/${driveId}/items/${itemId}`, {
@@ -167,6 +173,7 @@ export function registerFileCommands(program: Command): void {
     .action(async (itemId, opts) => {
       try {
         const { driveId } = resolveDrive(opts);
+        validateId(itemId, "item ID");
         const result = await graph.patch<unknown>(`/drives/${driveId}/items/${itemId}`, {
           name: opts.name,
         });
@@ -184,6 +191,7 @@ export function registerFileCommands(program: Command): void {
     .action(async (itemId, opts) => {
       try {
         const { driveId } = resolveDrive(opts);
+        validateId(itemId, "item ID");
         await graph.delete(`/drives/${driveId}/items/${itemId}`);
         outputData({ message: `Item ${itemId} deleted.` });
       } catch (err) {

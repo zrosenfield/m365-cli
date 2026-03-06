@@ -1,11 +1,12 @@
 import { Command } from "commander";
-import { graph } from "../lib/graph.js";
+import { graph, validateId } from "../lib/graph.js";
 import { readConfig } from "../lib/config.js";
 import { outputData, handleCommandError } from "../lib/output.js";
 
 function resolveSite(opts: { site?: string }): string {
   const siteId = opts.site || readConfig().defaultSiteId;
   if (!siteId) throw new Error("Site ID required. Use --site or run `sp config set --site <id>`.");
+  validateId(siteId, "site ID");
   return siteId;
 }
 
@@ -35,6 +36,7 @@ export function registerListCommands(program: Command): void {
     .action(async (listId, opts) => {
       try {
         const siteId = resolveSite(opts);
+        validateId(listId, "list ID");
         const result = await graph.get<unknown>(`/sites/${siteId}/lists/${listId}`);
         outputData(result);
       } catch (err) {
@@ -69,6 +71,7 @@ export function registerListCommands(program: Command): void {
     .action(async (listId, opts) => {
       try {
         const siteId = resolveSite(opts);
+        validateId(listId, "list ID");
         const body: Record<string, unknown> = {};
         if (opts.name) body.displayName = opts.name;
         if (Object.keys(body).length === 0) throw new Error("No updates provided.");
@@ -86,6 +89,7 @@ export function registerListCommands(program: Command): void {
     .action(async (listId, opts) => {
       try {
         const siteId = resolveSite(opts);
+        validateId(listId, "list ID");
         await graph.delete(`/sites/${siteId}/lists/${listId}`);
         outputData({ message: `List ${listId} deleted.` });
       } catch (err) {
@@ -106,6 +110,7 @@ export function registerListCommands(program: Command): void {
     .action(async (listId, opts) => {
       try {
         const siteId = resolveSite(opts);
+        validateId(listId, "list ID");
         const params = new URLSearchParams();
         params.set("expand", "fields");
         if (opts.filter) params.set("$filter", opts.filter);
@@ -126,6 +131,8 @@ export function registerListCommands(program: Command): void {
     .action(async (listId, itemId, opts) => {
       try {
         const siteId = resolveSite(opts);
+        validateId(listId, "list ID");
+        validateId(itemId, "item ID");
         const result = await graph.get<unknown>(
           `/sites/${siteId}/lists/${listId}/items/${itemId}?expand=fields`
         );
@@ -143,6 +150,7 @@ export function registerListCommands(program: Command): void {
     .action(async (listId, opts) => {
       try {
         const siteId = resolveSite(opts);
+        validateId(listId, "list ID");
         const fields = JSON.parse(opts.fields) as Record<string, unknown>;
         const result = await graph.post<unknown>(`/sites/${siteId}/lists/${listId}/items`, {
           fields,
@@ -161,6 +169,8 @@ export function registerListCommands(program: Command): void {
     .action(async (listId, itemId, opts) => {
       try {
         const siteId = resolveSite(opts);
+        validateId(listId, "list ID");
+        validateId(itemId, "item ID");
         const fields = JSON.parse(opts.fields) as Record<string, unknown>;
         const result = await graph.patch<unknown>(
           `/sites/${siteId}/lists/${listId}/items/${itemId}/fields`,
@@ -179,6 +189,8 @@ export function registerListCommands(program: Command): void {
     .action(async (listId, itemId, opts) => {
       try {
         const siteId = resolveSite(opts);
+        validateId(listId, "list ID");
+        validateId(itemId, "item ID");
         await graph.delete(`/sites/${siteId}/lists/${listId}/items/${itemId}`);
         outputData({ message: `Item ${itemId} deleted from list ${listId}.` });
       } catch (err) {
@@ -197,6 +209,7 @@ export function registerListCommands(program: Command): void {
     .action(async (listId, opts) => {
       try {
         const siteId = resolveSite(opts);
+        validateId(listId, "list ID");
         const result = await graph.get<{ value: unknown[] }>(
           `/sites/${siteId}/lists/${listId}/columns`
         );
@@ -213,6 +226,8 @@ export function registerListCommands(program: Command): void {
     .action(async (listId, columnId, opts) => {
       try {
         const siteId = resolveSite(opts);
+        validateId(listId, "list ID");
+        validateId(columnId, "column ID");
         const result = await graph.get<unknown>(
           `/sites/${siteId}/lists/${listId}/columns/${columnId}`
         );
@@ -235,6 +250,7 @@ export function registerListCommands(program: Command): void {
     .action(async (listId, opts) => {
       try {
         const siteId = resolveSite(opts);
+        validateId(listId, "list ID");
 
         const columnDef: Record<string, unknown> = {
           name: opts.name,
@@ -293,6 +309,8 @@ export function registerListCommands(program: Command): void {
     .action(async (listId, columnId, opts) => {
       try {
         const siteId = resolveSite(opts);
+        validateId(listId, "list ID");
+        validateId(columnId, "column ID");
         const body: Record<string, unknown> = {};
         if (opts.name) body.displayName = opts.name;
         if (opts.required !== undefined) body.required = opts.required === "true";
@@ -314,6 +332,8 @@ export function registerListCommands(program: Command): void {
     .action(async (listId, columnId, opts) => {
       try {
         const siteId = resolveSite(opts);
+        validateId(listId, "list ID");
+        validateId(columnId, "column ID");
         await graph.delete(`/sites/${siteId}/lists/${listId}/columns/${columnId}`);
         outputData({ message: `Column ${columnId} removed from list ${listId}.` });
       } catch (err) {

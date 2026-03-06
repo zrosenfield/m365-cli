@@ -17,8 +17,21 @@ const GRAPH_SCOPES = ["https://graph.microsoft.com/.default"];
 const DELEGATED_SCOPES = [
   "https://graph.microsoft.com/Sites.ReadWrite.All",
   "https://graph.microsoft.com/Files.ReadWrite.All",
+  "https://graph.microsoft.com/Mail.ReadWrite",
+  "https://graph.microsoft.com/Mail.Send",
+  "https://graph.microsoft.com/Calendars.ReadWrite",
+  "https://graph.microsoft.com/Calendars.ReadWrite.Shared",
   "offline_access",
 ];
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DOMAIN_RE = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/;
+
+function validateTenantId(tenantId: string): void {
+  if (!UUID_RE.test(tenantId) && !DOMAIN_RE.test(tenantId)) {
+    throw new Error(`Invalid tenant ID "${tenantId}": must be a GUID or domain name (e.g. contoso.onmicrosoft.com).`);
+  }
+}
 
 const KEYTAR_SERVICE = "sp-cli";
 const KEYTAR_ACCOUNT = "access-token";
@@ -111,6 +124,7 @@ export async function getClientCredentialToken(
   clientId: string,
   clientSecret: string
 ): Promise<string> {
+  validateTenantId(tenantId);
   const msalConfig: Configuration = {
     auth: {
       clientId,
@@ -134,6 +148,7 @@ export async function deviceCodeLogin(
   tenantId: string,
   clientId: string
 ): Promise<string> {
+  validateTenantId(tenantId);
   const msalConfig: Configuration = {
     auth: {
       clientId,

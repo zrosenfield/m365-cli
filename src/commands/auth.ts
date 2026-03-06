@@ -27,7 +27,6 @@ export function registerAuthCommands(program: Command): void {
     .description("Configure tenant ID, client ID, and optionally client secret")
     .option("--tenant-id <tenantId>", "Azure AD tenant ID (GUID or domain)")
     .option("--client-id <clientId>", "App registration client ID")
-    .option("--client-secret <secret>", "Client secret (for service principal auth)")
     .option("--tenant-url <url>", "SharePoint tenant URL (e.g. https://contoso.sharepoint.com)")
     .action(async (opts) => {
       try {

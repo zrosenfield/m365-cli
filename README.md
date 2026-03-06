@@ -1,11 +1,11 @@
 # sp-cli
 
-SharePoint Online CLI for [openclaw](https://github.com/openclaw) agents. Exposes SharePoint file and list operations as a structured `sp` command that AI agents can call programmatically.
+SharePoint Online CLI for AI agents. Exposes SharePoint file and list operations as a structured `sp` command that AI agents can call programmatically.
 
 ## Install
 
 ```bash
-npm install -g @openclaw/sp-cli
+npm install -g sp-cli
 ```
 
 Or from source:

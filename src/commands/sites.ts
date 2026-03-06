@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { graph } from "../lib/graph.js";
+import { graph, validateId } from "../lib/graph.js";
 import { readConfig } from "../lib/config.js";
 import { outputData, handleCommandError } from "../lib/output.js";
 
@@ -39,6 +39,7 @@ export function registerSiteCommands(program: Command): void {
           const sitePath = parsed.pathname;
           path = `/sites/${hostname}:${sitePath}`;
         } else if (siteId) {
+          validateId(siteId, "site ID");
           path = `/sites/${siteId}`;
         } else {
           const tenantUrl = resolveTenant(opts);

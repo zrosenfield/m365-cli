@@ -2,6 +2,7 @@ import fetch, { Response, RequestInit } from "node-fetch";
 import { getAccessToken } from "./auth.js";
 
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
+const GRAPH_HOST = "graph.microsoft.com";
 
 export class GraphError extends Error {
   constructor(
@@ -35,6 +36,12 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return res.buffer() as unknown as Promise<T>;
 }
 
+export function validateId(value: string, name = "ID"): void {
+  if (value.includes("/") || value.includes("\\") || value.includes("..")) {
+    throw new Error(`Invalid ${name}: must not contain path separators.`);
+  }
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -46,7 +53,16 @@ async function request<T>(
   } = {}
 ): Promise<T> {
   const token = await getAccessToken();
-  const url = path.startsWith("https://") ? path : `${GRAPH_BASE}${path}`;
+  let url: string;
+  if (path.startsWith("https://")) {
+    const parsed = new URL(path);
+    if (parsed.hostname !== GRAPH_HOST) {
+      throw new Error(`Refused to send credentials to non-Graph host: ${parsed.hostname}`);
+    }
+    url = path;
+  } else {
+    url = `${GRAPH_BASE}${path}`;
+  }
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,

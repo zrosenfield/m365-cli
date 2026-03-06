@@ -1,11 +1,12 @@
 import { Command } from "commander";
-import { graph } from "../lib/graph.js";
+import { graph, validateId } from "../lib/graph.js";
 import { readConfig } from "../lib/config.js";
 import { outputData, handleCommandError } from "../lib/output.js";
 
 function resolveSite(opts: { site?: string }): string {
   const siteId = opts.site || readConfig().defaultSiteId;
   if (!siteId) throw new Error("Site ID required. Use --site or run `sp config set --site <id>`.");
+  validateId(siteId, "site ID");
   return siteId;
 }
 
@@ -33,6 +34,7 @@ export function registerDriveCommands(program: Command): void {
     .action(async (driveId, opts) => {
       try {
         const siteId = resolveSite(opts);
+        validateId(driveId, "drive ID");
         const result = await graph.get<unknown>(`/sites/${siteId}/drives/${driveId}`);
         outputData(result);
       } catch (err) {
