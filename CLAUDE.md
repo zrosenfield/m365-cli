@@ -2,7 +2,7 @@
 
 ## Prerequisite Skill
 
-Before using any `m365` commands, read: [`skills/sp-shared/SKILL.md`](skills/sp-shared/SKILL.md)
+Before using any `m365` commands, read: [`skills/m365-shared/SKILL.md`](skills/m365-shared/SKILL.md)
 
 This teaches you:
 - How to authenticate (service principal, device code, env var)
@@ -14,9 +14,9 @@ This teaches you:
 
 | Skill | Path | Covers |
 |---|---|---|
-| `sp-shared` | `skills/sp-shared/SKILL.md` | Auth, config, sites, drives — **read first** |
-| `sp-files` | `skills/sp-files/SKILL.md` | File upload/download/copy/move/delete/search |
-| `sp-lists` | `skills/sp-lists/SKILL.md` | List CRUD, list items, column management |
+| `m365-shared` | `skills/m365-shared/SKILL.md` | Auth, config, sites, drives — **read first** |
+| `m365-files` | `skills/m365-files/SKILL.md` | File upload/download/copy/move/delete/search |
+| `m365-lists` | `skills/m365-lists/SKILL.md` | List CRUD, list items, column management |
 | `m365-mail` | `skills/m365-mail/SKILL.md` | Read/send/reply/delete mail, folders |
 | `m365-calendar` | `skills/m365-calendar/SKILL.md` | Calendar CRUD, events, RSVP, shared calendars |
 

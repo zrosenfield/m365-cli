@@ -7,7 +7,7 @@ metadata:
     category: "productivity"
     requires:
       bins: ["m365"]
-      skills: ["sp-shared"]
+      skills: ["m365-shared"]
     cliHelp: "m365 mail --help"
 ---
 
@@ -15,7 +15,7 @@ metadata:
 
 ## Prerequisites
 
-Complete auth setup from `sp-shared` SKILL.md. Mail commands require delegated auth (device code login) with Mail permissions:
+Complete auth setup from `m365-shared` SKILL.md. Mail commands require delegated auth (device code login) with Mail permissions:
 
 ```bash
 # Ensure you have Mail scopes — re-login if needed

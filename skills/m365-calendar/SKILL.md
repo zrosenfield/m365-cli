@@ -7,7 +7,7 @@ metadata:
     category: "productivity"
     requires:
       bins: ["m365"]
-      skills: ["sp-shared"]
+      skills: ["m365-shared"]
     cliHelp: "m365 calendar --help"
 ---
 
@@ -15,7 +15,7 @@ metadata:
 
 ## Prerequisites
 
-Complete auth setup from `sp-shared` SKILL.md. Calendar commands require delegated auth with Calendar permissions:
+Complete auth setup from `m365-shared` SKILL.md. Calendar commands require delegated auth with Calendar permissions:
 
 ```bash
 m365 auth login

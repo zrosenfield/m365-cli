@@ -1,37 +1,37 @@
 ---
-name: sp-shared
+name: m365-shared
 version: 0.1.0
-description: "SharePoint CLI: Auth, config, global flags, and site/drive discovery. Prerequisite for all sp-* skills."
+description: "M365 CLI: Auth, config, global flags, and site/drive discovery. Prerequisite for all m365-* skills."
 metadata:
   openclaw:
     category: "productivity"
     requires:
-      bins: ["sp"]
-    cliHelp: "sp --help"
+      bins: ["m365"]
+    cliHelp: "m365 --help"
 ---
 
-# sp-shared — Auth, Config & Global Concepts
+# m365-shared — Auth, Config & Global Concepts
 
 ## Prerequisites
 
-Install and build the CLI:
+Install the CLI:
 ```bash
-npm install -g sp-cli
+npm install -g github:zrosenfield/m365-cli
 # or from source:
-cd sp-cli && npm install && npm run build && npm link
+git clone https://github.com/zrosenfield/m365-cli && cd m365-cli && npm install && npm run build && npm link
 ```
 
-Verify: `sp --version`
+Verify: `m365 --version`
 
 ---
 
 ## Authentication
 
-sp supports three auth methods, tried in this order on every command:
+m365 supports three auth methods, tried in this order on every command:
 
 1. `SP_CLI_ACCESS_TOKEN` env var
 2. Client credentials (service principal) — if `clientSecret` is configured
-3. Stored delegated token — set by `sp auth login`
+3. Stored delegated token — set by `m365 auth login`
 
 ### Permission models — choose one
 
@@ -44,13 +44,13 @@ The app acts as your signed-in user account. It can only access sites your accou
 SP_CLI_TENANT_ID=...
 SP_CLI_CLIENT_ID=...
 
-sp auth login    # one-time browser sign-in; token stored in OS keychain
-sp sites list    # works, scoped to your account's access
+m365 auth login    # one-time browser sign-in; token stored in OS keychain
+m365 sites list    # works, scoped to your account's access
 ```
 
 App registration prerequisite: **Authentication → Advanced settings → Allow public client flows → Yes** (required for device code).
 
-Tokens expire (typically 1 hour access / 90-day refresh). Re-run `sp auth login` if you get auth errors.
+Tokens expire (typically 1 hour access / 90-day refresh). Re-run `m365 auth login` if you get auth errors.
 
 **`Sites.Selected` — app-only, scoped to specific sites**
 
@@ -62,7 +62,7 @@ SP_CLI_TENANT_ID=...
 SP_CLI_CLIENT_ID=...
 SP_CLI_CLIENT_SECRET=...
 
-sp sites list    # works only for sites the admin has granted
+m365 sites list    # works only for sites the admin has granted
 ```
 
 Admin grants access once per site via Graph API (see README App Registration section).
@@ -73,10 +73,10 @@ Easiest to set up but broadest blast radius. Requires Global/SharePoint Admin co
 
 ### Auth commands
 ```
-sp auth setup    [--tenant-id <id>] [--client-id <id>] [--client-secret <secret>] [--tenant-url <url>]
-sp auth login    # Device code flow; requires tenantId + clientId configured
-sp auth logout   # Delete stored keychain token
-sp auth token    # Print current access token; --raw for bare string
+m365 auth setup    [--tenant-id <id>] [--client-id <id>] [--tenant-url <url>]
+m365 auth login    # Device code flow; requires tenantId + clientId configured
+m365 auth logout   # Delete stored keychain token
+m365 auth token    # Print current access token; --raw for bare string
 ```
 
 ---
@@ -86,8 +86,8 @@ sp auth token    # Print current access token; --raw for bare string
 Config is stored at `~/.sp-cli/config.json` (mode 0600).
 
 ```
-sp config set [--tenant <url>] [--site <siteId>] [--drive <driveId>] [--tenant-id <id>] [--client-id <id>]
-sp config get
+m365 config set [--tenant <url>] [--site <siteId>] [--drive <driveId>] [--tenant-id <id>] [--client-id <id>]
+m365 config get
 ```
 
 **Keys:**
@@ -122,7 +122,7 @@ Errors go to **stderr**:
 { "error": { "code": "...", "message": "...", "status": 404 } }
 ```
 
-Use `--raw` (on `sp auth token`) or pipe through `jq .data` to extract values.
+Use `--raw` (on `m365 auth token`) or pipe through `jq .data` to extract values.
 
 ---
 
@@ -132,19 +132,19 @@ Before using file or list commands, discover the IDs you need:
 
 ```bash
 # List all sites in tenant
-sp sites list | jq '.data[] | {id, displayName, webUrl}'
+m365 sites list | jq '.data[] | {id, displayName, webUrl}'
 
 # Get root site
-sp sites get | jq '.data.id'
+m365 sites get | jq '.data.id'
 
 # Get site by URL
-sp sites get --url https://contoso.sharepoint.com/sites/mysite
+m365 sites get --url https://contoso.sharepoint.com/sites/mysite
 
 # List drives (document libraries) in a site
-sp drives list --site <site-id> | jq '.data[] | {id, name}'
+m365 drives list --site <site-id> | jq '.data[] | {id, name}'
 
 # Save defaults to avoid repeating flags
-sp config set --site <site-id> --drive <drive-id>
+m365 config set --site <site-id> --drive <drive-id>
 ```
 
 ---
@@ -154,9 +154,11 @@ sp config set --site <site-id> --drive <drive-id>
 **Delegated (device code) — no admin consent needed:**
 - `Sites.ReadWrite.All` (delegated) — covers lists and list items too
 - `Files.ReadWrite.All` (delegated)
+- `Mail.ReadWrite` (delegated)
+- `Mail.Send` (delegated)
+- `Calendars.ReadWrite` (delegated)
+- `Calendars.ReadWrite.Shared` (delegated)
 - `offline_access` (delegated)
-
-Note: `Lists.ReadWrite.All` does not exist as a delegated permission; list access is included in `Sites.ReadWrite.All`.
 
 **`Sites.Selected` — app-only, scoped:**
 - `Sites.Selected` (application) — admin consents this, then grants per-site via Graph API
@@ -170,6 +172,6 @@ Note: `Lists.ReadWrite.All` does not exist as a delegated permission; list acces
 
 ## Security Rules
 
-- Never log or expose the access token in command output (use `sp auth token --raw | ...` and pipe directly).
+- Never log or expose the access token in command output (use `m365 auth token --raw | ...` and pipe directly).
 - Config file is written with mode 0600; never commit `~/.sp-cli/config.json`.
-- Client secrets should use `sp auth setup` rather than being placed in environment variables in scripts that get committed.
+- Client secrets should use `m365 auth setup` rather than being placed in environment variables in scripts that get committed.
