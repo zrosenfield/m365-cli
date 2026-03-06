@@ -9,6 +9,7 @@ import { registerListCommands } from "./commands/lists.js";
 import { registerPermissionCommands } from "./commands/permissions.js";
 import { registerMailCommands } from "./commands/mail.js";
 import { registerCalendarCommands } from "./commands/calendar.js";
+import { registerTeamsCommands } from "./commands/teams.js";
 
 const program = new Command();
 
@@ -26,6 +27,7 @@ registerListCommands(program);
 registerPermissionCommands(program);
 registerMailCommands(program);
 registerCalendarCommands(program);
+registerTeamsCommands(program);
 
 program.parseAsync(process.argv).catch(() => {
   // Errors are handled and printed inside each command via handleCommandError.
