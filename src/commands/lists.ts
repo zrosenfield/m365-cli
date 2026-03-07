@@ -17,12 +17,23 @@ export function registerListCommands(program: Command): void {
 
   lists
     .command("list")
-    .description("List all lists in a site")
+    .description("List all lists in a site (use --type to filter by generic or documentLibrary)")
     .option("--site <id>", "Site ID")
+    .option("--type <type>", "Filter by template type: generic or documentLibrary")
     .action(async (opts) => {
       try {
         const siteId = resolveSite(opts);
-        const result = await graph.get<{ value: unknown[] }>(`/sites/${siteId}/lists`);
+        const params = new URLSearchParams();
+        if (opts.type) {
+          if (opts.type !== "generic" && opts.type !== "documentLibrary") {
+            throw new Error("--type must be 'generic' or 'documentLibrary'");
+          }
+          params.set("$filter", `list/template eq '${opts.type}'`);
+        }
+        const url = params.toString()
+          ? `/sites/${siteId}/lists?${params.toString()}`
+          : `/sites/${siteId}/lists`;
+        const result = await graph.get<{ value: unknown[] }>(url);
         outputData(result.value);
       } catch (err) {
         handleCommandError(err);
@@ -46,16 +57,15 @@ export function registerListCommands(program: Command): void {
 
   lists
     .command("create")
-    .description("Create a new list")
+    .description("Create a new metadata list (generic template). To create a document library, use `m365 drives` or the SharePoint UI.")
     .requiredOption("--name <name>", "List display name")
     .option("--site <id>", "Site ID")
-    .option("--template <template>", "List template: generic or documentLibrary", "generic")
     .action(async (opts) => {
       try {
         const siteId = resolveSite(opts);
         const result = await graph.post<unknown>(`/sites/${siteId}/lists`, {
           displayName: opts.name,
-          list: { template: opts.template },
+          list: { template: "generic" },
         });
         outputData(result);
       } catch (err) {

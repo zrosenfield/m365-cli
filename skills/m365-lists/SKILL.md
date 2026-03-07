@@ -1,7 +1,7 @@
 ---
 name: m365-lists
 version: 0.1.0
-description: "SharePoint Lists: Create and manage lists, list items, and columns (including document library columns)."
+description: "SharePoint Lists: Create and manage metadata lists, list items, and columns."
 metadata:
   openclaw:
     category: "productivity"
@@ -12,6 +12,20 @@ metadata:
 ---
 
 # m365-lists — SharePoint List Operations
+
+## Lists vs Document Libraries
+
+SharePoint has two distinct object types that both appear as "lists" in the Graph API:
+
+| Type | Template | Purpose | Managed via |
+|---|---|---|---|
+| **List** | `generic` | Pure metadata: rows and columns, no file storage | `m365 lists` |
+| **Document Library** | `documentLibrary` | File storage with metadata columns | `m365 files` / `m365 drives` |
+
+**Always use `m365 lists create` for metadata lists only.**
+To create a document library, use the SharePoint UI or `m365 drives`.
+
+`m365 lists list` returns both types by default. Use `--type generic` to show only metadata lists.
 
 ## Prerequisites
 
@@ -28,8 +42,12 @@ m365 config set --site <site-id>
 
 ### List all lists in a site
 ```bash
-m365 lists list [--site <id>]
+m365 lists list [--site <id>] [--type generic|documentLibrary]
 
+# Only metadata lists (not document libraries)
+m365 lists list --type generic | jq '.data[] | {id, displayName}'
+
+# All lists (includes document libraries)
 m365 lists list | jq '.data[] | {id, displayName, list}'
 ```
 
@@ -42,10 +60,10 @@ m365 lists get 01ABC123-...
 
 ### Create a list
 ```bash
-m365 lists create --name <name> [--template generic|documentLibrary] [--site <id>]
+# Creates a generic metadata list (NOT a document library)
+m365 lists create --name <name> [--site <id>]
 
 m365 lists create --name "Project Tasks"
-m365 lists create --name "Assets" --template documentLibrary
 ```
 
 ### Update a list
@@ -113,14 +131,7 @@ m365 lists items delete 01ABC123-... 42
 
 ## Columns
 
-Columns apply to both generic lists and document libraries. To manage document library columns, first find the library's list ID:
-
-```bash
-# Get the list ID for a document library named "Documents"
-m365 lists list | jq '.data[] | select(.displayName=="Documents") | .id'
-```
-
-Then use `m365 lists columns *` with that list ID.
+Columns apply to generic metadata lists. (Document library columns can also be managed this way, but use `m365 lists list --type documentLibrary` to find those list IDs.)
 
 ### List columns
 ```bash
