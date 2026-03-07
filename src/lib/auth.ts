@@ -4,6 +4,8 @@ import {
   DeviceCodeRequest,
   AuthenticationResult,
   Configuration,
+  ICachePlugin,
+  TokenCacheContext,
 } from "@azure/msal-node";
 import fs from "fs";
 import path from "path";
@@ -41,6 +43,32 @@ function validateTenantId(tenantId: string): void {
 const KEYTAR_SERVICE = "sp-cli";
 const KEYTAR_ACCOUNT = "access-token";
 const TOKEN_FILE = path.join(os.homedir(), ".sp-cli", "token");
+const MSAL_CACHE_FILE = path.join(os.homedir(), ".sp-cli", "msal-cache.json");
+
+function createCachePlugin(): ICachePlugin {
+  return {
+    beforeCacheAccess: async (cacheContext: TokenCacheContext) => {
+      try {
+        if (fs.existsSync(MSAL_CACHE_FILE)) {
+          const data = fs.readFileSync(MSAL_CACHE_FILE, "utf8");
+          cacheContext.tokenCache.deserialize(data);
+        }
+      } catch {}
+    },
+    afterCacheAccess: async (cacheContext: TokenCacheContext) => {
+      if (cacheContext.cacheHasChanged) {
+        try {
+          const dir = path.dirname(MSAL_CACHE_FILE);
+          fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+          fs.writeFileSync(MSAL_CACHE_FILE, cacheContext.tokenCache.serialize(), {
+            encoding: "utf8",
+            mode: 0o600,
+          });
+        } catch {}
+      }
+    },
+  };
+}
 
 async function getKeytar() {
   try {
@@ -98,6 +126,32 @@ export async function deleteStoredToken(): Promise<void> {
   deleteTokenFile();
 }
 
+export async function acquireTokenSilent(
+  tenantId: string,
+  clientId: string
+): Promise<string | null> {
+  try {
+    validateTenantId(tenantId);
+    const msalConfig: Configuration = {
+      auth: {
+        clientId,
+        authority: `https://login.microsoftonline.com/${tenantId}`,
+      },
+      cache: { cachePlugin: createCachePlugin() },
+    };
+    const pca = new PublicClientApplication(msalConfig);
+    const accounts = await pca.getTokenCache().getAllAccounts();
+    if (accounts.length === 0) return null;
+    const result = await pca.acquireTokenSilent({
+      scopes: DELEGATED_SCOPES,
+      account: accounts[0],
+    });
+    return result?.accessToken ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getAccessToken(): Promise<string> {
   // 1. Env var override
   if (process.env.SP_CLI_ACCESS_TOKEN) {
@@ -115,7 +169,13 @@ export async function getAccessToken(): Promise<string> {
     );
   }
 
-  // 3. Stored delegated token
+  // 3. MSAL silent refresh (uses persisted refresh token from prior device code login)
+  if (config.tenantId && config.clientId) {
+    const silent = await acquireTokenSilent(config.tenantId, config.clientId);
+    if (silent) return silent;
+  }
+
+  // 4. Stored raw token (legacy fallback)
   const stored = await getStoredToken();
   if (stored) return stored;
 
@@ -161,7 +221,10 @@ export async function deviceCodeLogin(
     },
   };
 
-  const pca = new PublicClientApplication(msalConfig);
+  const pca = new PublicClientApplication({
+    ...msalConfig,
+    cache: { cachePlugin: createCachePlugin() },
+  });
 
   const deviceCodeRequest: DeviceCodeRequest = {
     scopes: DELEGATED_SCOPES,
