@@ -1,6 +1,7 @@
 # m365-cli
 
 [![npm version](https://img.shields.io/npm/v/m365-cli.svg)](https://www.npmjs.com/package/m365-cli)
+[![CI](https://github.com/zrosenfield/m365-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/zrosenfield/m365-cli/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 > **Disclaimer:** This is not an officially supported Microsoft product and is not affiliated with, endorsed by, or sponsored by Microsoft Corporation.
