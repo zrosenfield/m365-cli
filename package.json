@@ -9,21 +9,27 @@
   "scripts": {
     "build": "tsc",
     "dev": "ts-node src/index.ts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run tests/integration"
   },
   "dependencies": {
     "@azure/msal-node": "^2.16.2",
     "commander": "^12.1.0",
     "keytar": "^7.9.0",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "update-notifier": "^5.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.17.6",
+    "@types/update-notifier": "^6.0.8",
     "ts-node": "^10.9.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.0"
   },
   "engines": {
     "node": ">=18"
   },
-  "license": "MIT"
+  "license": "Apache-2.0"
 }

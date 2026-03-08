@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+import updateNotifier from "update-notifier";
+import pkg from "../package.json";
+updateNotifier({ pkg }).notify();
+
 import { Command } from "commander";
 import { registerAuthCommands } from "./commands/auth.js";
 import { registerConfigCommands } from "./commands/config.js";

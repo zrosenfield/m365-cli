@@ -1,93 +1,107 @@
-# sp-cli
+# m365-cli
 
-SharePoint Online CLI for AI agents. Exposes SharePoint file and list operations as a structured `sp` command that AI agents can call programmatically.
+[![npm version](https://img.shields.io/npm/v/m365-cli.svg)](https://www.npmjs.com/package/m365-cli)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+
+> **Disclaimer:** This is not an officially supported Microsoft product and is not affiliated with, endorsed by, or sponsored by Microsoft Corporation.
+
+**Give your AI assistant access to your Microsoft 365 files, lists, mail, and calendar.**
+
+m365-cli is a command-line tool designed for AI agents (like Claude). You install it once and configure it — then your AI can read and write your SharePoint files, manage lists, send mail, and work with your calendar on your behalf. You don't need to type these commands yourself; your AI does.
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) version 18 or later
+- A Microsoft 365 account (work, school, or personal with M365 subscription)
+- An Azure AD app registration (see [App Registration](#app-registration) below — it's a one-time setup)
 
 ## Install
 
 ```bash
-npm install -g sp-cli
-```
-
-Or from source:
-
-```bash
-git clone <repo>
-cd sp-cli
-npm install
-npm run build
-npm link
+npm install -g m365-cli
 ```
 
 Requires Node.js ≥ 18.
 
-## Quickstart
+## Getting Started
 
-### 1. Configure authentication
+### Step 1: Create an Azure AD app registration
 
-These values come from an Azure AD app registration — see [App Registration](#app-registration) below for how to create one and which permission model to choose.
+Before you can authenticate, you need to register an app in Azure. This is a one-time step that gives m365-cli an identity in your Microsoft tenant.
 
-**Delegated / device code (recommended — acts as your user account):**
+See [App Registration](#app-registration) below. If you're just getting started for personal use, use the **Delegated** option — it requires no admin approval and accesses only what your own account can see.
+
+### Step 2: Configure authentication
+
+**Delegated / device code (recommended for personal use):**
 ```bash
-sp auth setup \
+m365 auth setup \
   --tenant-id "<Directory (tenant) ID from Azure AD>" \
   --client-id "<Application (client) ID from Azure AD>"
-sp auth login    # Prints a code; open the URL in a browser to complete sign-in
+m365 auth login    # Prints a code; open the URL in a browser to complete sign-in
 ```
-The app can only access what your account can access. Tokens expire; re-run `sp auth login` when they do.
+This acts as your user account. Tokens expire; re-run `m365 auth login` when they do.
 
-**Service principal / client credentials (headless agents, broad access):**
+**Service principal / client credentials (for headless agents or automation):**
 ```bash
-sp auth setup \
-  --tenant-id "<Directory (tenant) ID from Azure AD>" \
-  --client-id "<Application (client) ID from Azure AD>" \
-  --client-secret "<client secret value>" \
+export SP_CLI_CLIENT_SECRET="<your client secret value>"
+m365 auth setup \
+  --tenant-id "<Directory (tenant) ID>" \
+  --client-id "<Application (client) ID>" \
   --tenant-url "https://contoso.sharepoint.com"
 ```
-No interactive login needed, but requires admin-consented application permissions (see App Registration).
+No interactive login needed. Requires admin-consented application permissions (see App Registration).
 
 **Raw access token (escape hatch):**
 ```bash
 export SP_CLI_ACCESS_TOKEN="eyJ..."
 ```
 
-### 2. Discover your site and drive
+### Step 3: Find your site and drive
 
 ```bash
-sp sites list | jq '.data[] | {id, displayName}'
-sp drives list --site <site-id> | jq '.data[] | {id, name}'
-sp config set --site <site-id> --drive <drive-id>
+m365 sites list | jq '.data[] | {id, displayName}'
+m365 drives list --site <site-id> | jq '.data[] | {id, name}'
+m365 config set --site <site-id> --drive <drive-id>
 ```
 
-### 3. Use it
+### Step 4: Try it out
 
 ```bash
 # Files
-sp files list
-sp files upload ./report.xlsx --remote-path /Documents/report.xlsx
-sp files download <item-id> --output ./report.xlsx
-sp files search "quarterly report"
+m365 files list
+m365 files upload ./report.xlsx --remote-path /Documents/report.xlsx
+m365 files search "quarterly report"
 
 # Lists
-sp lists list
-sp lists items create <list-id> --fields '{"Title":"Task 1"}'
-sp lists items list <list-id>
+m365 lists list
+m365 lists items list <list-id>
+
+# Mail
+m365 mail list --top 5
+m365 mail send --to user@example.com --subject "Hello" --body "Hi there"
+
+# Calendar
+m365 calendar events list --top 5
 ```
 
 ## Command Reference
 
 | Area | Commands |
 |---|---|
-| Auth | `sp auth setup\|login\|logout\|token` |
-| Config | `sp config get\|set` |
-| Sites | `sp sites list\|get` |
-| Drives | `sp drives list\|get` |
-| Files | `sp files list\|get\|upload\|download\|copy\|move\|rename\|delete\|search` |
-| Lists | `sp lists list\|get\|create\|update\|delete` |
-| List items | `sp lists items list\|get\|create\|update\|delete` |
-| Columns | `sp lists columns list\|get\|add\|update\|remove` |
-| Permissions | `sp permissions list\|get\|grant\|update\|revoke` |
+| Auth | `m365 auth setup\|login\|logout\|token` |
+| Config | `m365 config get\|set` |
+| Sites | `m365 sites list\|get` |
+| Drives | `m365 drives list\|get` |
+| Files | `m365 files list\|get\|upload\|download\|copy\|move\|rename\|delete\|search` |
+| Lists | `m365 lists list\|get\|create\|update\|delete` |
+| List items | `m365 lists items list\|get\|create\|update\|delete` |
+| Columns | `m365 lists columns list\|get\|add\|update\|remove` |
+| Permissions | `m365 permissions list\|get\|grant\|update\|revoke` |
+| Mail | `m365 mail list\|get\|send\|reply\|delete\|folders` |
+| Calendar | `m365 calendar list\|get\|events list\|get\|create\|update\|delete\|rsvp` |
 
-Run `sp <command> --help` for detailed options.
+Run `m365 <command> --help` for detailed options.
 
 ## Output Format
 
@@ -101,62 +115,86 @@ Errors go to stderr:
 { "error": { "code": "...", "message": "...", "status": 404 } }
 ```
 
-## For Agents
+This structured output is what allows AI agents to parse and act on results reliably.
 
-See [`CLAUDE.md`](CLAUDE.md) for the entry point, and the skill files under `skills/` for full command documentation:
+## For AI Agents
 
-- [`skills/sp-shared/SKILL.md`](skills/sp-shared/SKILL.md) — Auth & config (read first)
-- [`skills/sp-files/SKILL.md`](skills/sp-files/SKILL.md) — File operations
-- [`skills/sp-lists/SKILL.md`](skills/sp-lists/SKILL.md) — List operations
+See [`CLAUDE.md`](CLAUDE.md) for the entry point. Full command documentation is in the skill files under `skills/`:
+
+- [`skills/m365-shared/SKILL.md`](skills/m365-shared/SKILL.md) — Auth & config (read first)
+- [`skills/m365-files/SKILL.md`](skills/m365-files/SKILL.md) — File operations
+- [`skills/m365-lists/SKILL.md`](skills/m365-lists/SKILL.md) — List operations
+- [`skills/m365-mail/SKILL.md`](skills/m365-mail/SKILL.md) — Mail operations
+- [`skills/m365-calendar/SKILL.md`](skills/m365-calendar/SKILL.md) — Calendar operations
 
 ## App Registration
 
-sp-cli authenticates through an **Azure AD app registration** — an identity that represents the CLI in your Microsoft 365 tenant. You need to create one before running `sp auth setup`.
+m365-cli authenticates through an **Azure AD app registration** — a one-time identity you create in the Azure portal that represents the CLI in your Microsoft 365 tenant.
 
-**Step 1: Create the app registration**
+### Which option should I use?
+
+| | Delegated (device code) | Sites.Selected (app-only) | Sites.ReadWrite.All (app-only) |
+|---|---|---|---|
+| **Access scope** | Whatever your user account can see | Only specific sites you grant | Every site in the tenant |
+| **Admin approval needed?** | No | Yes (SharePoint Admin) | Yes (Global or SharePoint Admin) |
+| **Best for** | Personal use, getting started | Agents with controlled access | Tenant-wide automation |
+
+**If you're not sure, start with Delegated.**
+
+---
+
+### Create the app registration (all options)
 
 1. Go to [portal.azure.com](https://portal.azure.com) → **Azure Active Directory** → **App registrations** → **New registration**
-2. Give it a name (e.g. "sp-cli"), leave defaults, click **Register**
+2. Give it a name (e.g. "m365-cli"), leave defaults, click **Register**
 3. On the overview page, copy:
-   - **Application (client) ID** → this is your `--client-id`
-   - **Directory (tenant) ID** → this is your `--tenant-id`
+   - **Application (client) ID** → your `--client-id`
+   - **Directory (tenant) ID** → your `--tenant-id`
 
-**Step 2: Choose a permission model**
+---
 
-There are three options, ordered from least to most access:
+### Delegated permissions (recommended starting point)
 
-| Model | Access scope | Admin consent | Best for |
-|---|---|---|---|
-| **Delegated** (device code) | Whatever your user account can access | Not required | Personal use, least privilege |
-| **`Sites.Selected`** (app-only) | Specific sites you explicitly grant | Required for the permission itself; SharePoint admin grants per-site | Headless agents with controlled blast radius |
-| **`Sites.ReadWrite.All`** (app-only) | Every site in the tenant | Required (Global/SharePoint Admin) | Tenant-wide automation |
-
-**Delegated permissions (recommended starting point):**
 1. Go to **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions**
-2. Add: `Sites.ReadWrite.All`, `Files.ReadWrite.All`, `offline_access`
-   - Note: `Lists.ReadWrite.All` does not exist as a delegated permission — list access is covered by `Sites.ReadWrite.All`
-3. No admin consent needed — you consent for yourself when you run `sp auth login`
-4. No client secret needed
-5. Go to **Authentication** → **Advanced settings** → set **Allow public client flows** to **Yes** and save — required for device code login
+2. Add: `Sites.ReadWrite.All`, `Files.ReadWrite.All`, `Mail.ReadWrite`, `Mail.Send`, `Calendars.ReadWrite`, `offline_access`
+3. No admin consent needed — you consent when you run `m365 auth login`
+4. Go to **Authentication** → **Advanced settings** → set **Allow public client flows** to **Yes** and save (required for device code login)
+5. No client secret needed
 
-**`Sites.Selected` — app-only, scoped to specific sites:**
+---
+
+### Sites.Selected — app-only, scoped to specific sites
+
 1. Go to **API permissions** → **Microsoft Graph** → **Application permissions** → add `Sites.Selected`
-2. Click **Grant admin consent** (unlocks the permission but grants no site access yet)
-3. A SharePoint admin must then explicitly grant the app access to each site:
+2. Click **Grant admin consent**
+3. A SharePoint admin must then grant the app access to each site:
    ```
    POST https://graph.microsoft.com/v1.0/sites/{siteId}/permissions
-   { "roles": ["write"], "grantedToIdentities": [{ "application": { "id": "<client-id>", "displayName": "sp-cli" } }] }
+   { "roles": ["write"], "grantedToIdentities": [{ "application": { "id": "<client-id>", "displayName": "m365-cli" } }] }
    ```
-4. Create a client secret (Certificates & secrets) and use `sp auth setup --client-secret`
+4. Create a client secret under **Certificates & secrets**, copy the value, and set `SP_CLI_CLIENT_SECRET` before running `m365 auth setup`
 
-**`Sites.ReadWrite.All` — app-only, full tenant:**
+---
+
+### Sites.ReadWrite.All — app-only, full tenant
+
 1. Go to **API permissions** → **Microsoft Graph** → **Application permissions**
-2. Add `Sites.ReadWrite.All`, `Files.ReadWrite.All`, `Lists.ReadWrite.All`
+2. Add `Sites.ReadWrite.All`, `Files.ReadWrite.All`, `Lists.ReadWrite.All`, `Mail.ReadWrite`, `Mail.Send`, `Calendars.ReadWrite`
 3. Click **Grant admin consent** (requires Global Admin or SharePoint Admin)
-4. Create a client secret and use `sp auth setup --client-secret`
+4. Create a client secret and set `SP_CLI_CLIENT_SECRET` before running `m365 auth setup`
 
-After completing setup, run `sp auth setup` with the values you copied.
+---
+
+## Building from Source
+
+```bash
+git clone https://github.com/zrosenfield/m365-cli
+cd m365-cli
+npm install
+npm run build    # compiles TypeScript → dist/
+npm link         # makes `m365` available globally
+```
 
 ## License
 
-MIT
+Apache 2.0 — see [LICENSE](LICENSE).

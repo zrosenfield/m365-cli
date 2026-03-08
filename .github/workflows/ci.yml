@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  build-and-test:
+    name: Build & Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+  integration:
+    name: Integration Smoke Tests
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    # Only run on pushes to main; secrets are unavailable on fork PRs so this
+    # job is skipped automatically in that case via the `if` condition below.
+    if: >
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      vars.INTEGRATION_ENABLED == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Integration smoke tests
+        run: npm run test:integration
+        env:
+          SP_CLI_TENANT_ID: ${{ secrets.SP_CLI_TENANT_ID }}
+          SP_CLI_CLIENT_ID: ${{ secrets.SP_CLI_CLIENT_ID }}
+          SP_CLI_CLIENT_SECRET: ${{ secrets.SP_CLI_CLIENT_SECRET }}
+          SP_CLI_TENANT_URL: ${{ secrets.SP_CLI_TENANT_URL }}
