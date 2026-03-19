@@ -19,6 +19,7 @@ This teaches you:
 | `m365-lists` | `skills/m365-lists/SKILL.md` | List CRUD, list items, column management |
 | `m365-mail` | `skills/m365-mail/SKILL.md` | Read/send/reply/delete mail, folders |
 | `m365-calendar` | `skills/m365-calendar/SKILL.md` | Calendar CRUD, events, RSVP, shared calendars |
+| `m365-docs` | `skills/m365-docs/SKILL.md` | Create/co-edit/export/share docs collaboratively in chat |
 
 ## Quick Reference
 

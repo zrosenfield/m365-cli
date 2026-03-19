@@ -215,4 +215,28 @@ export function registerFileCommands(program: Command): void {
         handleCommandError(err);
       }
     });
+
+  files
+    .command("read <itemId>")
+    .description("Print the text content of a file to stdout")
+    .option("--site <id>", "Site ID")
+    .option("--drive <id>", "Drive ID")
+    .action(async (itemId, opts) => {
+      try {
+        const { driveId } = resolveDrive(opts);
+        validateId(itemId, "item ID");
+        const meta = await graph.get<{ "@microsoft.graph.downloadUrl"?: string }>(
+          `/drives/${driveId}/items/${itemId}`
+        );
+        const downloadUrl = meta["@microsoft.graph.downloadUrl"];
+        if (!downloadUrl) throw new Error("No download URL available for this item.");
+        const fetch = (await import("node-fetch")).default;
+        const res = await fetch(downloadUrl);
+        if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
+        const text = await res.text();
+        process.stdout.write(text);
+      } catch (err) {
+        handleCommandError(err);
+      }
+    });
 }

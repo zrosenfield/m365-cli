@@ -6,7 +6,7 @@ metadata:
   openclaw:
     category: "productivity"
     requires:
-      bins: ["m365"]
+      bins: ["m365", "pandoc"]
       skills: ["m365-shared"]
     cliHelp: "m365 files --help"
 ---

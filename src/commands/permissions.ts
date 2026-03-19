@@ -139,4 +139,31 @@ export function registerPermissionCommands(program: Command): void {
         handleCommandError(err);
       }
     });
+
+  permissions
+    .command("create-link <itemId>")
+    .description("Create a sharing link for a file or folder")
+    .option("--type <type>", "Link type: view or edit (default: view)", "view")
+    .option("--scope <scope>", "Scope: organization or anonymous (default: organization)", "organization")
+    .option("--site <id>", "Site ID")
+    .option("--drive <id>", "Drive ID")
+    .action(async (itemId, opts) => {
+      try {
+        const { driveId } = resolveDrive(opts);
+        validateId(itemId, "item ID");
+        const typeMap: Record<string, string> = { view: "view", edit: "edit" };
+        const scopeMap: Record<string, string> = { organization: "organization", anonymous: "anonymous" };
+        const type = typeMap[opts.type];
+        const scope = scopeMap[opts.scope];
+        if (!type) throw new Error(`Invalid type: ${opts.type}. Use view or edit.`);
+        if (!scope) throw new Error(`Invalid scope: ${opts.scope}. Use organization or anonymous.`);
+        const result = await graph.post<{ link?: { webUrl?: string } }>(
+          `/drives/${driveId}/items/${itemId}/createLink`,
+          { type, scope }
+        );
+        outputData(result);
+      } catch (err) {
+        handleCommandError(err);
+      }
+    });
 }
