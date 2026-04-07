@@ -99,7 +99,7 @@ m365 calendar events list --top 5
 | List items | `m365 lists items list\|get\|create\|update\|delete` |
 | Columns | `m365 lists columns list\|get\|add\|update\|remove` |
 | Permissions | `m365 permissions list\|get\|grant\|update\|revoke` |
-| Mail | `m365 mail list\|get\|send\|reply\|delete\|folders` |
+| Mail | `m365 mail list\|get\|send\|reply\|delete\|folders\|delta` |
 | Calendar | `m365 calendar list\|get\|events list\|get\|create\|update\|delete\|rsvp` |
 
 Run `m365 <command> --help` for detailed options.
@@ -185,6 +185,34 @@ m365-cli authenticates through an **Azure AD app registration** — a one-time i
 4. Create a client secret and set `SP_CLI_CLIENT_SECRET` before running `m365 auth setup`
 
 ---
+
+## Mail change tracking
+
+`m365 mail delta` implements [Graph delta query](https://learn.microsoft.com/en-us/graph/delta-query-messages) for efficient, stateful change tracking of a mail folder. It persists an opaque delta link between calls so each invocation only returns what changed since the last run.
+
+```bash
+# First call: initialize state (suppress old-message flood with --init-quiet)
+m365 mail delta --init-quiet
+
+# Subsequent calls: only new/changed/deleted messages since last run
+m365 mail delta
+
+# Pipe to jq to extract subjects of new messages
+m365 mail delta | jq -r 'select(.["@removed"] == null) | .subject'
+
+# Track a different folder
+m365 mail delta --folder archive --init-quiet
+m365 mail delta --folder archive
+
+# Reset state (next call re-initializes from scratch)
+m365 mail delta --reset
+```
+
+Output is [NDJSON](https://ndjson.org/) by default — one JSON object per line, one per changed message. This is a deliberate deviation from the standard `{ "data": [...] }` envelope used by other commands, so watcher processes can pipe output to `jq -c` or `while read` loops without waiting for the full response. Use `--format json` to get the standard envelope.
+
+The delta link is stored at `$XDG_STATE_HOME/m365-cli/mail-delta-<folder>.link` (falls back to `~/.local/state/m365-cli/...`). This file is what allows the command to resume from where it left off; if it's deleted or `--reset` is used, the next call performs a full sync.
+
+This command is designed for use by an **external watcher process** (e.g. a systemd timer that calls `m365 mail delta` every 30 seconds and fires downstream events for new messages). The CLI is intentionally one-shot; the polling loop lives outside this tool.
 
 ## Building from Source
 

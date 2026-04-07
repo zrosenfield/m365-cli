@@ -84,7 +84,8 @@ async function request<T>(
 }
 
 export const graph = {
-  get: <T>(path: string) => request<T>("GET", path),
+  get: <T>(path: string, opts?: { headers?: Record<string, string> }) =>
+    request<T>("GET", path, opts ?? {}),
   post: <T>(path: string, body: unknown) => request<T>("POST", path, { body }),
   patch: <T>(path: string, body: unknown) => request<T>("PATCH", path, { body }),
   put: <T>(path: string, body: unknown) => request<T>("PUT", path, { body }),

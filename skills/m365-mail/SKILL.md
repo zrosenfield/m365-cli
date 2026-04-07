@@ -109,6 +109,47 @@ m365 mail folders get <folderId>
 m365 mail folders get AAMkAGI2...
 ```
 
+### Track mail changes (delta query)
+
+**Prefer this over polling `mail list --filter "isRead eq false"` for detecting new mail.** Delta queries are efficient and stateful — each call returns only what changed since the last.
+
+```bash
+# Initialize (first run): drain all pages, save delta link, emit nothing
+m365 mail delta --init-quiet
+
+# Subsequent calls: emit only changed messages as NDJSON since last run
+m365 mail delta
+
+# Pipe to jq to get subjects of new (non-deleted) messages
+m365 mail delta | jq -r 'select(.["@removed"] == null) | .subject'
+
+# Track a specific folder
+m365 mail delta --folder sentItems --init-quiet
+m365 mail delta --folder sentItems
+
+# Reset state (next run does full sync)
+m365 mail delta --reset
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--folder <name\|id>` | `inbox` | Well-known folder name or raw folder ID |
+| `--state-file <path>` | `$XDG_STATE_HOME/m365-cli/mail-delta-<folder>.link` | Where the delta link is persisted |
+| `--change-type <created\|updated\|deleted>` | (all) | Filter by change type (initial sync only) |
+| `--select <fields>` | `internetMessageId,from,subject,receivedDateTime,isRead` | Fields to return; `internetMessageId` always appended |
+| `--max-page-size <n>` | `50` | Max messages per page |
+| `--reset` | — | Delete state file and exit |
+| `--init-quiet` | — | First run: drain all pages silently, just save the delta link |
+| `--format ndjson\|json` | `ndjson` | Output format (NDJSON by default; `json` gives standard `{ "data": [...] }` envelope) |
+
+**Output format:** NDJSON by default (one JSON object per line). Each object is the raw Graph Message. Deleted messages arrive with `"@removed": {"reason": "deleted"}` — pass them through, don't filter.
+
+**Required permissions (delegated):** `Mail.Read`
+
+**State file location:** `$XDG_STATE_HOME/m365-cli/mail-delta-<folder>.link` (falls back to `~/.local/state/m365-cli/...`). Delete it or use `--reset` to force a full re-sync.
+
 ---
 
 ## Common Patterns
