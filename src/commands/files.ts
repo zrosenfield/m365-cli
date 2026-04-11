@@ -3,14 +3,16 @@ import fs from "fs";
 import path from "path";
 import { graph, validateId } from "../lib/graph.js";
 import { readConfig } from "../lib/config.js";
+import { resolveSiteId, resolveItemByPath } from "../lib/resolve.js";
 import { outputData, handleCommandError } from "../lib/output.js";
 
-function resolveDrive(opts: { site?: string; drive?: string }): { siteId: string; driveId: string } {
+async function resolveDrive(opts: { site?: string; drive?: string }): Promise<{ siteId: string; driveId: string }> {
   const config = readConfig();
-  const siteId = opts.site || config.defaultSiteId;
+  const rawSite = opts.site || config.defaultSiteId;
   const driveId = opts.drive || config.defaultDriveId;
-  if (!siteId) throw new Error("Site ID required. Use --site or run `sp config set --site <id>`.");
+  if (!rawSite) throw new Error("Site ID required. Use --site or run `sp config set --site <id>`.");
   if (!driveId) throw new Error("Drive ID required. Use --drive or run `sp config set --drive <id>`.");
+  const siteId = await resolveSiteId(rawSite);
   validateId(siteId, "site ID");
   validateId(driveId, "drive ID");
   return { siteId, driveId };
@@ -22,12 +24,12 @@ export function registerFileCommands(program: Command): void {
   files
     .command("list")
     .description("List files and folders in a drive path")
-    .option("--site <id>", "Site ID")
+    .option("--site <id>", "Site ID or URL")
     .option("--drive <id>", "Drive ID")
     .option("--path <folderPath>", "Remote folder path (default: root)")
     .action(async (opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
+        const { driveId } = await resolveDrive(opts);
         const folderPath = opts.path ? `:${opts.path}:` : "";
         const result = await graph.get<{ value: unknown[] }>(
           `/drives/${driveId}/root${folderPath}/children`
@@ -41,11 +43,11 @@ export function registerFileCommands(program: Command): void {
   files
     .command("get <itemId>")
     .description("Get metadata for a file or folder")
-    .option("--site <id>", "Site ID")
+    .option("--site <id>", "Site ID or URL")
     .option("--drive <id>", "Drive ID")
     .action(async (itemId, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
+        const { driveId } = await resolveDrive(opts);
         validateId(itemId, "item ID");
         const result = await graph.get<unknown>(`/drives/${driveId}/items/${itemId}`);
         outputData(result);
@@ -55,17 +57,22 @@ export function registerFileCommands(program: Command): void {
     });
 
   files
-    .command("upload <localPath>")
+    .command("upload [localPath]")
     .description("Upload a local file to SharePoint")
-    .option("--site <id>", "Site ID")
+    .option("--site <id>", "Site ID or URL")
     .option("--drive <id>", "Drive ID")
+    .option("--local-path <path>", "Local file path (takes precedence over positional argument)")
     .option("--remote-path <path>", "Destination path in drive (e.g. /Documents/file.txt)")
     .action(async (localPath, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
-        const fileName = path.basename(localPath);
+        const { driveId } = await resolveDrive(opts);
+        const resolvedLocalPath = opts.localPath || localPath;
+        if (!resolvedLocalPath) {
+          throw new Error("A local file path is required (positional argument or --local-path).");
+        }
+        const fileName = path.basename(resolvedLocalPath);
         const remotePath = opts.remotePath || `/${fileName}`;
-        const data = fs.readFileSync(localPath);
+        const data = fs.readFileSync(resolvedLocalPath);
         const result = await graph.upload<unknown>(
           `/drives/${driveId}/root:${remotePath}:/content`,
           data
@@ -77,20 +84,27 @@ export function registerFileCommands(program: Command): void {
     });
 
   files
-    .command("download <itemId>")
+    .command("download [itemId]")
     .description("Download a file from SharePoint")
-    .option("--site <id>", "Site ID")
+    .option("--site <id>", "Site ID or URL")
     .option("--drive <id>", "Drive ID")
-    .option("--output <localPath>", "Local path to save the file")
+    .option("--remote-path <path>", "Remote file path (alternative to item ID)")
+    .option("--output <localPath>", "Local path to save the file, or - to stream to stdout")
     .action(async (itemId, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
-        validateId(itemId, "item ID");
+        const { driveId } = await resolveDrive(opts);
 
-        // Get download URL
-        const meta = await graph.get<{ name?: string; "@microsoft.graph.downloadUrl"?: string }>(
-          `/drives/${driveId}/items/${itemId}`
-        );
+        let meta: { name?: string; "@microsoft.graph.downloadUrl"?: string };
+        if (opts.remotePath) {
+          meta = await resolveItemByPath(driveId, opts.remotePath);
+        } else {
+          if (!itemId) throw new Error("Either an item ID or --remote-path is required.");
+          validateId(itemId, "item ID");
+          meta = await graph.get<{ name?: string; "@microsoft.graph.downloadUrl"?: string }>(
+            `/drives/${driveId}/items/${itemId}`
+          );
+        }
+
         const downloadUrl = meta["@microsoft.graph.downloadUrl"];
         if (!downloadUrl) throw new Error("No download URL available for this item.");
 
@@ -98,10 +112,15 @@ export function registerFileCommands(program: Command): void {
         const res = await fetch(downloadUrl);
         if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
 
-        const outputPath = opts.output || path.basename(meta.name || itemId);
-        const buffer = await res.buffer();
-        fs.writeFileSync(outputPath, buffer);
-        outputData({ message: `Downloaded to ${outputPath}`, bytes: buffer.length });
+        if (opts.output === "-") {
+          const buffer = await res.buffer();
+          process.stdout.write(buffer);
+        } else {
+          const outputPath = opts.output || path.basename(meta.name || itemId || "download");
+          const buffer = await res.buffer();
+          fs.writeFileSync(outputPath, buffer);
+          outputData({ message: `Downloaded to ${outputPath}`, bytes: buffer.length });
+        }
       } catch (err) {
         handleCommandError(err);
       }
@@ -112,12 +131,12 @@ export function registerFileCommands(program: Command): void {
     .description("Copy a file to another location")
     .requiredOption("--dest-path <path>", "Destination folder path")
     .option("--dest-drive <id>", "Destination drive ID (default: same drive)")
-    .option("--site <id>", "Site ID")
+    .option("--site <id>", "Site ID or URL")
     .option("--drive <id>", "Drive ID")
     .option("--name <name>", "New name for the copy")
     .action(async (itemId, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
+        const { driveId } = await resolveDrive(opts);
         validateId(itemId, "item ID");
         const destDriveId = opts.destDrive || driveId;
 
@@ -140,19 +159,29 @@ export function registerFileCommands(program: Command): void {
     });
 
   files
-    .command("move <itemId>")
+    .command("move [itemId]")
     .description("Move a file to another location")
     .requiredOption("--dest-path <path>", "Destination folder path")
     .option("--dest-drive <id>", "Destination drive ID (default: same drive)")
-    .option("--site <id>", "Site ID")
+    .option("--site <id>", "Site ID or URL")
     .option("--drive <id>", "Drive ID")
+    .option("--remote-path <path>", "Remote source file path (alternative to item ID)")
     .action(async (itemId, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
-        validateId(itemId, "item ID");
-        const destDriveId = opts.destDrive || driveId;
+        const { driveId } = await resolveDrive(opts);
 
-        const result = await graph.patch<unknown>(`/drives/${driveId}/items/${itemId}`, {
+        let resolvedItemId: string;
+        if (opts.remotePath) {
+          const item = await resolveItemByPath(driveId, opts.remotePath);
+          resolvedItemId = item.id;
+        } else {
+          if (!itemId) throw new Error("Either an item ID or --remote-path is required.");
+          validateId(itemId, "item ID");
+          resolvedItemId = itemId;
+        }
+
+        const destDriveId = opts.destDrive || driveId;
+        const result = await graph.patch<unknown>(`/drives/${driveId}/items/${resolvedItemId}`, {
           parentReference: {
             driveId: destDriveId,
             path: `/drives/${destDriveId}/root:${opts.destPath}`,
@@ -168,11 +197,11 @@ export function registerFileCommands(program: Command): void {
     .command("rename <itemId>")
     .description("Rename a file or folder")
     .requiredOption("--name <newName>", "New name")
-    .option("--site <id>", "Site ID")
+    .option("--site <id>", "Site ID or URL")
     .option("--drive <id>", "Drive ID")
     .action(async (itemId, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
+        const { driveId } = await resolveDrive(opts);
         validateId(itemId, "item ID");
         const result = await graph.patch<unknown>(`/drives/${driveId}/items/${itemId}`, {
           name: opts.name,
@@ -186,11 +215,11 @@ export function registerFileCommands(program: Command): void {
   files
     .command("delete <itemId>")
     .description("Delete a file or folder")
-    .option("--site <id>", "Site ID")
+    .option("--site <id>", "Site ID or URL")
     .option("--drive <id>", "Drive ID")
     .action(async (itemId, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
+        const { driveId } = await resolveDrive(opts);
         validateId(itemId, "item ID");
         await graph.delete(`/drives/${driveId}/items/${itemId}`);
         outputData({ message: `Item ${itemId} deleted.` });
@@ -202,11 +231,11 @@ export function registerFileCommands(program: Command): void {
   files
     .command("search <query>")
     .description("Search for files in a drive")
-    .option("--site <id>", "Site ID")
+    .option("--site <id>", "Site ID or URL")
     .option("--drive <id>", "Drive ID")
     .action(async (query, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
+        const { driveId } = await resolveDrive(opts);
         const result = await graph.get<{ value: unknown[] }>(
           `/drives/${driveId}/root/search(q='${encodeURIComponent(query)}')`
         );
@@ -217,19 +246,30 @@ export function registerFileCommands(program: Command): void {
     });
 
   files
-    .command("read <itemId>")
+    .command("read [itemId]")
     .description("Print the text content of a file to stdout")
-    .option("--site <id>", "Site ID")
+    .option("--site <id>", "Site ID or URL")
     .option("--drive <id>", "Drive ID")
+    .option("--remote-path <path>", "Remote file path (alternative to item ID)")
     .action(async (itemId, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
-        validateId(itemId, "item ID");
-        const meta = await graph.get<{ "@microsoft.graph.downloadUrl"?: string }>(
-          `/drives/${driveId}/items/${itemId}`
-        );
-        const downloadUrl = meta["@microsoft.graph.downloadUrl"];
-        if (!downloadUrl) throw new Error("No download URL available for this item.");
+        const { driveId } = await resolveDrive(opts);
+
+        let downloadUrl: string;
+        if (opts.remotePath) {
+          const item = await resolveItemByPath(driveId, opts.remotePath);
+          downloadUrl = item["@microsoft.graph.downloadUrl"] ?? "";
+          if (!downloadUrl) throw new Error("No download URL available for this item.");
+        } else {
+          if (!itemId) throw new Error("Either an item ID or --remote-path is required.");
+          validateId(itemId, "item ID");
+          const meta = await graph.get<{ "@microsoft.graph.downloadUrl"?: string }>(
+            `/drives/${driveId}/items/${itemId}`
+          );
+          downloadUrl = meta["@microsoft.graph.downloadUrl"] ?? "";
+          if (!downloadUrl) throw new Error("No download URL available for this item.");
+        }
+
         const fetch = (await import("node-fetch")).default;
         const res = await fetch(downloadUrl);
         if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);

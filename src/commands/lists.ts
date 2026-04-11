@@ -1,11 +1,13 @@
 import { Command } from "commander";
 import { graph, validateId } from "../lib/graph.js";
 import { readConfig } from "../lib/config.js";
+import { resolveSiteId } from "../lib/resolve.js";
 import { outputData, handleCommandError } from "../lib/output.js";
 
-function resolveSite(opts: { site?: string }): string {
-  const siteId = opts.site || readConfig().defaultSiteId;
-  if (!siteId) throw new Error("Site ID required. Use --site or run `sp config set --site <id>`.");
+async function resolveSite(opts: { site?: string }): Promise<string> {
+  const rawSite = opts.site || readConfig().defaultSiteId;
+  if (!rawSite) throw new Error("Site ID required. Use --site or run `sp config set --site <id>`.");
+  const siteId = await resolveSiteId(rawSite);
   validateId(siteId, "site ID");
   return siteId;
 }
@@ -22,7 +24,7 @@ export function registerListCommands(program: Command): void {
     .option("--type <type>", "Filter by template type: generic or documentLibrary")
     .action(async (opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         const params = new URLSearchParams();
         if (opts.type) {
           if (opts.type !== "generic" && opts.type !== "documentLibrary") {
@@ -46,7 +48,7 @@ export function registerListCommands(program: Command): void {
     .option("--site <id>", "Site ID")
     .action(async (listId, opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         validateId(listId, "list ID");
         const result = await graph.get<unknown>(`/sites/${siteId}/lists/${listId}`);
         outputData(result);
@@ -62,7 +64,7 @@ export function registerListCommands(program: Command): void {
     .option("--site <id>", "Site ID")
     .action(async (opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         const result = await graph.post<unknown>(`/sites/${siteId}/lists`, {
           displayName: opts.name,
           list: { template: "generic" },
@@ -80,7 +82,7 @@ export function registerListCommands(program: Command): void {
     .option("--name <name>", "New display name")
     .action(async (listId, opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         validateId(listId, "list ID");
         const body: Record<string, unknown> = {};
         if (opts.name) body.displayName = opts.name;
@@ -98,7 +100,7 @@ export function registerListCommands(program: Command): void {
     .option("--site <id>", "Site ID")
     .action(async (listId, opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         validateId(listId, "list ID");
         await graph.delete(`/sites/${siteId}/lists/${listId}`);
         outputData({ message: `List ${listId} deleted.` });
@@ -119,7 +121,7 @@ export function registerListCommands(program: Command): void {
     .option("--select <fields>", "Comma-separated fields to return")
     .action(async (listId, opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         validateId(listId, "list ID");
         const params = new URLSearchParams();
         params.set("expand", "fields");
@@ -140,7 +142,7 @@ export function registerListCommands(program: Command): void {
     .option("--site <id>", "Site ID")
     .action(async (listId, itemId, opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         validateId(listId, "list ID");
         validateId(itemId, "item ID");
         const result = await graph.get<unknown>(
@@ -159,7 +161,7 @@ export function registerListCommands(program: Command): void {
     .option("--site <id>", "Site ID")
     .action(async (listId, opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         validateId(listId, "list ID");
         const fields = JSON.parse(opts.fields) as Record<string, unknown>;
         const result = await graph.post<unknown>(`/sites/${siteId}/lists/${listId}/items`, {
@@ -178,7 +180,7 @@ export function registerListCommands(program: Command): void {
     .option("--site <id>", "Site ID")
     .action(async (listId, itemId, opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         validateId(listId, "list ID");
         validateId(itemId, "item ID");
         const fields = JSON.parse(opts.fields) as Record<string, unknown>;
@@ -198,7 +200,7 @@ export function registerListCommands(program: Command): void {
     .option("--site <id>", "Site ID")
     .action(async (listId, itemId, opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         validateId(listId, "list ID");
         validateId(itemId, "item ID");
         await graph.delete(`/sites/${siteId}/lists/${listId}/items/${itemId}`);
@@ -218,7 +220,7 @@ export function registerListCommands(program: Command): void {
     .option("--site <id>", "Site ID")
     .action(async (listId, opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         validateId(listId, "list ID");
         const result = await graph.get<{ value: unknown[] }>(
           `/sites/${siteId}/lists/${listId}/columns`
@@ -235,7 +237,7 @@ export function registerListCommands(program: Command): void {
     .option("--site <id>", "Site ID")
     .action(async (listId, columnId, opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         validateId(listId, "list ID");
         validateId(columnId, "column ID");
         const result = await graph.get<unknown>(
@@ -259,7 +261,7 @@ export function registerListCommands(program: Command): void {
     .option("--site <id>", "Site ID")
     .action(async (listId, opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         validateId(listId, "list ID");
 
         const columnDef: Record<string, unknown> = {
@@ -318,7 +320,7 @@ export function registerListCommands(program: Command): void {
     .option("--required <bool>", "Set required (true/false)")
     .action(async (listId, columnId, opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         validateId(listId, "list ID");
         validateId(columnId, "column ID");
         const body: Record<string, unknown> = {};
@@ -341,7 +343,7 @@ export function registerListCommands(program: Command): void {
     .option("--site <id>", "Site ID")
     .action(async (listId, columnId, opts) => {
       try {
-        const siteId = resolveSite(opts);
+        const siteId = await resolveSite(opts);
         validateId(listId, "list ID");
         validateId(columnId, "column ID");
         await graph.delete(`/sites/${siteId}/lists/${listId}/columns/${columnId}`);

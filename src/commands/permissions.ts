@@ -1,14 +1,16 @@
 import { Command } from "commander";
 import { graph, validateId } from "../lib/graph.js";
 import { readConfig } from "../lib/config.js";
+import { resolveSiteId } from "../lib/resolve.js";
 import { outputData, handleCommandError } from "../lib/output.js";
 
-function resolveDrive(opts: { site?: string; drive?: string }): { siteId: string; driveId: string } {
+async function resolveDrive(opts: { site?: string; drive?: string }): Promise<{ siteId: string; driveId: string }> {
   const config = readConfig();
-  const siteId = opts.site || config.defaultSiteId;
+  const rawSite = opts.site || config.defaultSiteId;
   const driveId = opts.drive || config.defaultDriveId;
-  if (!siteId) throw new Error("Site ID required. Use --site or run `sp config set --site <id>`.");
+  if (!rawSite) throw new Error("Site ID required. Use --site or run `sp config set --site <id>`.");
   if (!driveId) throw new Error("Drive ID required. Use --drive or run `sp config set --drive <id>`.");
+  const siteId = await resolveSiteId(rawSite);
   validateId(siteId, "site ID");
   validateId(driveId, "drive ID");
   return { siteId, driveId };
@@ -24,7 +26,7 @@ export function registerPermissionCommands(program: Command): void {
     .option("--drive <id>", "Drive ID")
     .action(async (itemId, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
+        const { driveId } = await resolveDrive(opts);
         validateId(itemId, "item ID");
         const result = await graph.get<{ value: unknown[] }>(
           `/drives/${driveId}/items/${itemId}/permissions`
@@ -42,7 +44,7 @@ export function registerPermissionCommands(program: Command): void {
     .option("--drive <id>", "Drive ID")
     .action(async (itemId, permId, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
+        const { driveId } = await resolveDrive(opts);
         validateId(itemId, "item ID");
         validateId(permId, "permission ID");
         const result = await graph.get<unknown>(
@@ -63,7 +65,7 @@ export function registerPermissionCommands(program: Command): void {
     .option("--drive <id>", "Drive ID")
     .action(async (itemId, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
+        const { driveId } = await resolveDrive(opts);
         validateId(itemId, "item ID");
         const emails = opts.emails.split(",").map((e: string) => e.trim());
 
@@ -101,7 +103,7 @@ export function registerPermissionCommands(program: Command): void {
     .option("--drive <id>", "Drive ID")
     .action(async (itemId, permId, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
+        const { driveId } = await resolveDrive(opts);
         validateId(itemId, "item ID");
         validateId(permId, "permission ID");
         const roleMap: Record<string, string> = {
@@ -130,7 +132,7 @@ export function registerPermissionCommands(program: Command): void {
     .option("--drive <id>", "Drive ID")
     .action(async (itemId, permId, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
+        const { driveId } = await resolveDrive(opts);
         validateId(itemId, "item ID");
         validateId(permId, "permission ID");
         await graph.delete(`/drives/${driveId}/items/${itemId}/permissions/${permId}`);
@@ -149,7 +151,7 @@ export function registerPermissionCommands(program: Command): void {
     .option("--drive <id>", "Drive ID")
     .action(async (itemId, opts) => {
       try {
-        const { driveId } = resolveDrive(opts);
+        const { driveId } = await resolveDrive(opts);
         validateId(itemId, "item ID");
         const typeMap: Record<string, string> = { view: "view", edit: "edit" };
         const scopeMap: Record<string, string> = { organization: "organization", anonymous: "anonymous" };

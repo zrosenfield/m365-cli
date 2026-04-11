@@ -10,7 +10,7 @@ import {
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { readConfig } from "./config.js";
+import { readConfig, getConfigDir, isProfileActive } from "./config.js";
 
 // Client credentials (app-only) must use /.default — individual scopes are for delegated flows
 const GRAPH_SCOPES = ["https://graph.microsoft.com/.default"];
@@ -43,18 +43,29 @@ function validateTenantId(tenantId: string): void {
 const KEYTAR_SERVICE = "m365-cli";
 const LEGACY_KEYTAR_SERVICE = "sp-cli";
 const KEYTAR_ACCOUNT = "access-token";
-const NEW_CLI_DIR = path.join(os.homedir(), ".m365-cli");
+
+// Legacy paths kept as constants for backward-compat / migration fallback.
 const LEGACY_CLI_DIR = path.join(os.homedir(), ".sp-cli");
-const TOKEN_FILE = path.join(NEW_CLI_DIR, "token");
 const LEGACY_TOKEN_FILE = path.join(LEGACY_CLI_DIR, "token");
-const MSAL_CACHE_FILE = path.join(NEW_CLI_DIR, "msal-cache.json");
 const LEGACY_MSAL_CACHE_FILE = path.join(LEGACY_CLI_DIR, "msal-cache.json");
+
+// Dynamic helpers — respect the active profile directory.
+function getMsalCacheFile(): string {
+  return path.join(getConfigDir(), "msal-cache.json");
+}
+
+function getActiveTokenFile(): string {
+  return path.join(getConfigDir(), "token");
+}
 
 function createCachePlugin(): ICachePlugin {
   return {
     beforeCacheAccess: async (cacheContext: TokenCacheContext) => {
-      const file = fs.existsSync(MSAL_CACHE_FILE) ? MSAL_CACHE_FILE
-        : fs.existsSync(LEGACY_MSAL_CACHE_FILE) ? LEGACY_MSAL_CACHE_FILE
+      const primaryFile = getMsalCacheFile();
+      // When a profile is active, only use the profile's cache file.
+      // Otherwise fall back to the legacy path for migration purposes.
+      const file = fs.existsSync(primaryFile) ? primaryFile
+        : (!isProfileActive() && fs.existsSync(LEGACY_MSAL_CACHE_FILE)) ? LEGACY_MSAL_CACHE_FILE
         : null;
       if (file) {
         try { cacheContext.tokenCache.deserialize(fs.readFileSync(file, "utf8")); } catch {}
@@ -62,9 +73,11 @@ function createCachePlugin(): ICachePlugin {
     },
     afterCacheAccess: async (cacheContext: TokenCacheContext) => {
       if (cacheContext.cacheHasChanged) {
+        const configDir = getConfigDir();
+        const cacheFile = getMsalCacheFile();
         try {
-          fs.mkdirSync(NEW_CLI_DIR, { recursive: true, mode: 0o700 });
-          fs.writeFileSync(MSAL_CACHE_FILE, cacheContext.tokenCache.serialize(), {
+          fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
+          fs.writeFileSync(cacheFile, cacheContext.tokenCache.serialize(), {
             encoding: "utf8",
             mode: 0o600,
           });
@@ -87,12 +100,16 @@ async function getKeytar() {
 }
 
 function storeTokenFile(token: string): void {
-  fs.mkdirSync(NEW_CLI_DIR, { recursive: true, mode: 0o700 });
-  fs.writeFileSync(TOKEN_FILE, token, { encoding: "utf8", mode: 0o600 });
+  const dir = getConfigDir();
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(getActiveTokenFile(), token, { encoding: "utf8", mode: 0o600 });
 }
 
-function getTokenFile(): string | null {
-  for (const f of [TOKEN_FILE, LEGACY_TOKEN_FILE]) {
+function getTokenFileContent(): string | null {
+  const primaryFile = getActiveTokenFile();
+  // For profile mode, only use the profile's token file (no legacy fallback).
+  const files = isProfileActive() ? [primaryFile] : [primaryFile, LEGACY_TOKEN_FILE];
+  for (const f of files) {
     try {
       if (fs.existsSync(f)) return fs.readFileSync(f, "utf8").trim();
     } catch {}
@@ -100,13 +117,20 @@ function getTokenFile(): string | null {
   return null;
 }
 
-function deleteTokenFile(): void {
-  for (const f of [TOKEN_FILE, LEGACY_TOKEN_FILE]) {
+function deleteTokenFiles(): void {
+  const primaryFile = getActiveTokenFile();
+  const files = isProfileActive() ? [primaryFile] : [primaryFile, LEGACY_TOKEN_FILE];
+  for (const f of files) {
     try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch {}
   }
 }
 
 export async function storeToken(token: string): Promise<void> {
+  // Profiles always use file-based storage to keep each profile isolated.
+  if (isProfileActive()) {
+    storeTokenFile(token);
+    return;
+  }
   const keytar = await getKeytar();
   if (keytar) {
     await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, token);
@@ -116,21 +140,30 @@ export async function storeToken(token: string): Promise<void> {
 }
 
 export async function getStoredToken(): Promise<string | null> {
+  // Profiles always use file-based storage.
+  if (isProfileActive()) {
+    return getTokenFileContent();
+  }
   const keytar = await getKeytar();
   if (keytar) {
     return (await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT))
       ?? (await keytar.getPassword(LEGACY_KEYTAR_SERVICE, KEYTAR_ACCOUNT));
   }
-  return getTokenFile();
+  return getTokenFileContent();
 }
 
 export async function deleteStoredToken(): Promise<void> {
+  // Profiles always use file-based storage.
+  if (isProfileActive()) {
+    deleteTokenFiles();
+    return;
+  }
   const keytar = await getKeytar();
   if (keytar) {
     await keytar.deletePassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
     await keytar.deletePassword(LEGACY_KEYTAR_SERVICE, KEYTAR_ACCOUNT);
   }
-  deleteTokenFile();
+  deleteTokenFiles();
 }
 
 export async function acquireTokenSilent(

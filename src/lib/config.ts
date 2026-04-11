@@ -5,10 +5,36 @@ import os from "os";
 const NEW_CONFIG_DIR = path.join(os.homedir(), ".m365-cli");
 const LEGACY_CONFIG_DIR = path.join(os.homedir(), ".sp-cli");
 
-function resolveConfigDir(): string {
-  if (fs.existsSync(NEW_CONFIG_DIR)) return NEW_CONFIG_DIR;
-  if (fs.existsSync(LEGACY_CONFIG_DIR)) return LEGACY_CONFIG_DIR;
+// When set, all config reads/writes use this directory instead of the defaults.
+let _profileDir: string | null = null;
+
+/** Activate a named profile directory.  Pass null to deactivate. */
+export function setProfileDir(dir: string | null): void {
+  _profileDir = dir;
+}
+
+/** Returns true when a named profile is currently active. */
+export function isProfileActive(): boolean {
+  return _profileDir !== null;
+}
+
+function resolveDefaultConfigDir(): string {
+  // Check for config.json specifically — the directory may exist (e.g. from
+  // creating a profiles subdirectory) without a config file inside it.
+  if (fs.existsSync(path.join(NEW_CONFIG_DIR, "config.json"))) return NEW_CONFIG_DIR;
+  if (fs.existsSync(path.join(LEGACY_CONFIG_DIR, "config.json"))) return LEGACY_CONFIG_DIR;
   return NEW_CONFIG_DIR;
+}
+
+/**
+ * Returns the active configuration directory.
+ *
+ * Priority: profile dir (if set) → ~/.m365-cli (if exists) → ~/.sp-cli
+ * (migration fallback) → ~/.m365-cli (default for new installs).
+ */
+export function getConfigDir(): string {
+  if (_profileDir !== null) return _profileDir;
+  return resolveDefaultConfigDir();
 }
 
 export interface SpConfig {
@@ -21,7 +47,7 @@ export interface SpConfig {
 }
 
 export function readConfig(): SpConfig {
-  const configFile = path.join(resolveConfigDir(), "config.json");
+  const configFile = path.join(getConfigDir(), "config.json");
   let file: SpConfig = {};
   try {
     if (fs.existsSync(configFile)) {
@@ -44,8 +70,9 @@ export function readConfig(): SpConfig {
 }
 
 export function writeConfig(config: SpConfig): void {
-  fs.mkdirSync(NEW_CONFIG_DIR, { recursive: true, mode: 0o700 });
-  fs.writeFileSync(path.join(NEW_CONFIG_DIR, "config.json"), JSON.stringify(config, null, 2), {
+  const configDir = getConfigDir();
+  fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(path.join(configDir, "config.json"), JSON.stringify(config, null, 2), {
     encoding: "utf8",
     mode: 0o600,
   });
@@ -59,6 +86,11 @@ export function mergeConfig(updates: Partial<SpConfig>): SpConfig {
 }
 
 export function clearConfig(): void {
+  if (_profileDir !== null) {
+    const f = path.join(_profileDir, "config.json");
+    if (fs.existsSync(f)) fs.unlinkSync(f);
+    return;
+  }
   for (const dir of [NEW_CONFIG_DIR, LEGACY_CONFIG_DIR]) {
     const f = path.join(dir, "config.json");
     if (fs.existsSync(f)) fs.unlinkSync(f);
