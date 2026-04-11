@@ -40,26 +40,30 @@ function validateTenantId(tenantId: string): void {
   }
 }
 
-const KEYTAR_SERVICE = "sp-cli";
+const KEYTAR_SERVICE = "m365-cli";
+const LEGACY_KEYTAR_SERVICE = "sp-cli";
 const KEYTAR_ACCOUNT = "access-token";
-const TOKEN_FILE = path.join(os.homedir(), ".sp-cli", "token");
-const MSAL_CACHE_FILE = path.join(os.homedir(), ".sp-cli", "msal-cache.json");
+const NEW_CLI_DIR = path.join(os.homedir(), ".m365-cli");
+const LEGACY_CLI_DIR = path.join(os.homedir(), ".sp-cli");
+const TOKEN_FILE = path.join(NEW_CLI_DIR, "token");
+const LEGACY_TOKEN_FILE = path.join(LEGACY_CLI_DIR, "token");
+const MSAL_CACHE_FILE = path.join(NEW_CLI_DIR, "msal-cache.json");
+const LEGACY_MSAL_CACHE_FILE = path.join(LEGACY_CLI_DIR, "msal-cache.json");
 
 function createCachePlugin(): ICachePlugin {
   return {
     beforeCacheAccess: async (cacheContext: TokenCacheContext) => {
-      try {
-        if (fs.existsSync(MSAL_CACHE_FILE)) {
-          const data = fs.readFileSync(MSAL_CACHE_FILE, "utf8");
-          cacheContext.tokenCache.deserialize(data);
-        }
-      } catch {}
+      const file = fs.existsSync(MSAL_CACHE_FILE) ? MSAL_CACHE_FILE
+        : fs.existsSync(LEGACY_MSAL_CACHE_FILE) ? LEGACY_MSAL_CACHE_FILE
+        : null;
+      if (file) {
+        try { cacheContext.tokenCache.deserialize(fs.readFileSync(file, "utf8")); } catch {}
+      }
     },
     afterCacheAccess: async (cacheContext: TokenCacheContext) => {
       if (cacheContext.cacheHasChanged) {
         try {
-          const dir = path.dirname(MSAL_CACHE_FILE);
-          fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+          fs.mkdirSync(NEW_CLI_DIR, { recursive: true, mode: 0o700 });
           fs.writeFileSync(MSAL_CACHE_FILE, cacheContext.tokenCache.serialize(), {
             encoding: "utf8",
             mode: 0o600,
@@ -75,7 +79,7 @@ async function getKeytar() {
     const keytar = await import("keytar");
     // Verify keytar actually works (fails silently on WSL)
     const k = keytar.default ?? keytar;
-    await k.getPassword("__sp-cli-test__", "__test__");
+    await k.getPassword("__m365-cli-test__", "__test__");
     return k;
   } catch {
     return null;
@@ -83,22 +87,23 @@ async function getKeytar() {
 }
 
 function storeTokenFile(token: string): void {
-  const dir = path.dirname(TOKEN_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  fs.mkdirSync(NEW_CLI_DIR, { recursive: true, mode: 0o700 });
   fs.writeFileSync(TOKEN_FILE, token, { encoding: "utf8", mode: 0o600 });
 }
 
 function getTokenFile(): string | null {
-  try {
-    if (fs.existsSync(TOKEN_FILE)) return fs.readFileSync(TOKEN_FILE, "utf8").trim();
-  } catch {}
+  for (const f of [TOKEN_FILE, LEGACY_TOKEN_FILE]) {
+    try {
+      if (fs.existsSync(f)) return fs.readFileSync(f, "utf8").trim();
+    } catch {}
+  }
   return null;
 }
 
 function deleteTokenFile(): void {
-  try {
-    if (fs.existsSync(TOKEN_FILE)) fs.unlinkSync(TOKEN_FILE);
-  } catch {}
+  for (const f of [TOKEN_FILE, LEGACY_TOKEN_FILE]) {
+    try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch {}
+  }
 }
 
 export async function storeToken(token: string): Promise<void> {
@@ -113,7 +118,8 @@ export async function storeToken(token: string): Promise<void> {
 export async function getStoredToken(): Promise<string | null> {
   const keytar = await getKeytar();
   if (keytar) {
-    return keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+    return (await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT))
+      ?? (await keytar.getPassword(LEGACY_KEYTAR_SERVICE, KEYTAR_ACCOUNT));
   }
   return getTokenFile();
 }
@@ -122,6 +128,7 @@ export async function deleteStoredToken(): Promise<void> {
   const keytar = await getKeytar();
   if (keytar) {
     await keytar.deletePassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+    await keytar.deletePassword(LEGACY_KEYTAR_SERVICE, KEYTAR_ACCOUNT);
   }
   deleteTokenFile();
 }
@@ -180,7 +187,7 @@ export async function getAccessToken(): Promise<string> {
   if (stored) return stored;
 
   throw new Error(
-    "Not authenticated. Run `sp auth setup` then `sp auth login`, or set SP_CLI_ACCESS_TOKEN."
+    "Not authenticated. Run `m365 auth setup` then `m365 auth login`, or set SP_CLI_ACCESS_TOKEN."
   );
 }
 

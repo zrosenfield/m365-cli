@@ -20,7 +20,7 @@ describe("readConfig env var overrides", () => {
   afterEach(clearEnv);
 
   it("does not throw when no env vars are set", () => {
-    // readConfig reads ~/.sp-cli/config.json which may or may not exist.
+    // readConfig reads ~/.m365-cli/config.json (or ~/.sp-cli for legacy) which may or may not exist.
     // We only verify it returns without throwing.
     expect(() => readConfig()).not.toThrow();
   });

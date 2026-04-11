@@ -2,8 +2,14 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 
-const CONFIG_DIR = path.join(os.homedir(), ".sp-cli");
-const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
+const NEW_CONFIG_DIR = path.join(os.homedir(), ".m365-cli");
+const LEGACY_CONFIG_DIR = path.join(os.homedir(), ".sp-cli");
+
+function resolveConfigDir(): string {
+  if (fs.existsSync(NEW_CONFIG_DIR)) return NEW_CONFIG_DIR;
+  if (fs.existsSync(LEGACY_CONFIG_DIR)) return LEGACY_CONFIG_DIR;
+  return NEW_CONFIG_DIR;
+}
 
 export interface SpConfig {
   tenantId?: string;
@@ -15,10 +21,11 @@ export interface SpConfig {
 }
 
 export function readConfig(): SpConfig {
+  const configFile = path.join(resolveConfigDir(), "config.json");
   let file: SpConfig = {};
   try {
-    if (fs.existsSync(CONFIG_FILE)) {
-      file = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")) as SpConfig;
+    if (fs.existsSync(configFile)) {
+      file = JSON.parse(fs.readFileSync(configFile, "utf8")) as SpConfig;
     }
   } catch {
     // ignore parse errors
@@ -37,8 +44,8 @@ export function readConfig(): SpConfig {
 }
 
 export function writeConfig(config: SpConfig): void {
-  fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), {
+  fs.mkdirSync(NEW_CONFIG_DIR, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(path.join(NEW_CONFIG_DIR, "config.json"), JSON.stringify(config, null, 2), {
     encoding: "utf8",
     mode: 0o600,
   });
@@ -52,7 +59,8 @@ export function mergeConfig(updates: Partial<SpConfig>): SpConfig {
 }
 
 export function clearConfig(): void {
-  if (fs.existsSync(CONFIG_FILE)) {
-    fs.unlinkSync(CONFIG_FILE);
+  for (const dir of [NEW_CONFIG_DIR, LEGACY_CONFIG_DIR]) {
+    const f = path.join(dir, "config.json");
+    if (fs.existsSync(f)) fs.unlinkSync(f);
   }
 }

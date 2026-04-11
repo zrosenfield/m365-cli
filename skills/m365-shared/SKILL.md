@@ -83,7 +83,7 @@ m365 auth token    # Print current access token; --raw for bare string
 
 ## Configuration
 
-Config is stored at `~/.sp-cli/config.json` (mode 0600).
+Config is stored at `~/.m365-cli/config.json` (mode 0600).
 
 ```
 m365 config set [--tenant <url>] [--site <siteId>] [--drive <driveId>] [--tenant-id <id>] [--client-id <id>]
@@ -173,5 +173,5 @@ m365 config set --site <site-id> --drive <drive-id>
 ## Security Rules
 
 - Never log or expose the access token in command output (use `m365 auth token --raw | ...` and pipe directly).
-- Config file is written with mode 0600; never commit `~/.sp-cli/config.json`.
+- Config file is written with mode 0600; never commit `~/.m365-cli/config.json`.
 - Client secrets should use `m365 auth setup` rather than being placed in environment variables in scripts that get committed.
